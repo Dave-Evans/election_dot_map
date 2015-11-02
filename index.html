@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+
+<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.2/leaflet.css" />
+
+<style type="text/css">
+
+body, html { width: 100%; height: 100%; margin: 0; padding: 0;}
+body { background-color: rgb(77,77,77); font-family: 'Helvetica','Helvetica Neue','Arial',sans-serif; }
+
+#map { width: 100%; height: 100%; border: 0; margin-left: auto; margin-right: auto; }
+
+
+.x.axis path {
+  display: none;
+}
+
+.x-brush .extent {
+  stroke:#737373;
+  fill: #F4CC38;
+  fill-opacity:0.125;
+  shape-rendering:crispEdges;
+  }
+
+.tick {
+	font-size: 0.8em;
+  fill: #eee; 
+}
+
+#brush-holder { 
+	position: fixed;
+	bottom: 0;
+	width: 100%;
+}
+
+#top-holder {
+  position: fixed;
+  top: 0;
+  left: 20px;
+  border-top: 0;
+}
+
+#title-bar { font-size: 0.8em;
+    background-color: #E6E1D1;
+
+ }
+
+#title { font-weight: bold; float: left; padding: 8px;}
+
+.choice-button { float: left; padding: 8px; }
+
+.choice-button:hover { background-color: #DFCD8D; cursor: pointer; }
+
+.roll-down { 
+  display: none; 
+  padding: 8px;
+  background-color: #EBEBEB;
+  opacity: 0.7;
+  max-width: 100%;
+}
+
+.hider { cursor: pointer; font-size: 0.6em; color: #222222; padding: 4px; float: left; font-style: italic;}
+
+.legend-icon { width: 8px; height: 8px; float: left; margin-right: 4px;}
+.legend-label { font-size: 0.6em; margin-bottom: 6px;}
+
+#about-content { font-size: 0.8em; line-height: 1.5em;}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<div id="top-holder">
+<div id="title-bar">
+  <div id="title">Election Dot Map For Wisconsin - Presidential Race 2012</div>
+  <div id="legend-button" class="choice-button" onClick="triggerMenu('#legend-content');">Legend</div>
+  <div id="about-button" class="choice-button" onClick="triggerMenu('#about-content');">About</div>
+<div style="clear:both;"></div>
+</div> 
+
+<div id="legend-content" class="roll-down"><div id="legend-innards"></div><div class="hider" onClick="triggerMenu('',true);">&#9650; Hide</div><div style="clear:both;"></div>
+</div>
+<div id="about-content" class="roll-down"><div id="about-innards">Scroll around the state to see the election results for the Presidential Election from 2012. Each dot represents a voter, or, in the case of the grey dots, people who are estimated to live within that block that did not cast a vote.
+<br><br>
+This has been put together using data from election returns distributed to a block level, and census 2010 to find, by difference, who did not cast a ballot. This has been assembled by Dave Evans, but with much help from  <a href="http://people.matinic.us/garrett/">Garrett Dash Nelson</a>. Download the source on <a href="https://github.com/Dave-Evans/election_dot_map">GitHub</a>. </div><div class="hider" onClick="triggerMenu('',true);">&#9650; Hide</div><div style="clear:both;"></div>
+</div>
+
+</div>
+
+<div id="brush-holder"></div>
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+<script src="http://cdn.leafletjs.com/leaflet-0.7.2/leaflet.js"></script>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src='./canvas_overlay.js'></script>
+
+
+<script>
+
+	
+function triggerMenu(choice,all) {
+
+  $(".roll-down").slideUp();
+  if(!all) { $(choice).slideDown(); }
+
+}
+	
+var colors = {
+	
+"DEM" : "rgba(5,113,176,0.5)",
+"REP" : "rgba(202,0,32,0.5)", /*"#ca0020",*/
+"NOVOTE" : "rgba(186,186,186,0.1)",
+"IND" : "rgba(94,60,153,0.5)"
+
+}
+
+
+//Build the map
+var the_map = L.map('map')
+	.setView([43.9718,-89.764],12)
+
+the_map.zoomControl.setPosition('bottomleft');
+
+L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}.png', {'attribution': '<a href="http://stamen.com">Stamen Design</a>'})
+    .addTo(the_map);
+
+// Create empty canvasOverlay
+var the_canvas = L.canvasOverlay()
+  .addTo(the_map);
+
+//Build the line graph and brusher
+var margin = {top: 20, right: 20, bottom: 40, left: 20},
+    width = $('body').innerWidth() - margin.left - margin.right,
+    height = 0.2*$('body').innerHeight() - margin.top - margin.bottom;
+
+var x = d3.time.scale()
+    .range([0, width]);
+
+var y = d3.scale.linear()
+    .range([height, 0]);
+
+var svg = d3.select("#brush-holder").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv('./data/voterPoints.csv', function(error, data) {
+
+the_canvas
+	.drawing(colorDots)
+	.params({'data': data})
+    .redraw();
+
+}); 
+
+
+function colorDots(canvasOverlay, params) {
+    var ctx = params.canvas.getContext('2d');
+    ctx.clearRect(0, 0, params.canvas.width, params.canvas.height);
+    params.options.data.map(function (d, i) {
+        if (params.bounds.contains([+d.lat, +d.lon])) {
+            dot = canvasOverlay._map.latLngToContainerPoint([+d.lat,+d.lon]);
+            var style = d.voterType;
+    		if(colors[style]) { var color = colors[style]; } else { var color = "#ccc"; }	
+    		ctx.fillStyle = color;
+    		if(params.zoom > 14) { var rad = 5; } else if (params.zoom > 12) { var rad = 3; } else { var rad = 1; }
+            ctx.beginPath();
+            ctx.arc(dot.x, dot.y, rad, 0, Math.PI*2);
+            ctx.fill();
+            ctx.closePath();
+        }
+    });
+}
+
+
+$("#about-content").width($("#title-bar").width()-16); 
+
+var legend_html = ""
+
+$.each(colors, function(style, color) { 
+
+legend_html += '<div class="legend-icon" style="background-color:';
+legend_html += color;
+legend_html += '"></div> ';
+legend_html += '<div class="legend-label">';
+legend_html += style;
+legend_html += '</div>';
+
+})
+      
+$("#legend-innards").html(legend_html);
+
+</script>
+
+
+
+</body>

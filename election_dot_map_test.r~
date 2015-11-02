@@ -12,10 +12,10 @@ library(classInt)
 #	red
 	#ef8a62
 
-file_wards = "/media/devans/KINGSTON/misc/election_dot_map/wards_2011"
-file_blocks = "/media/devans/KINGSTON/misc/election_dot_map/blocks"
-file_ed_ward = "/media/devans/KINGSTON/misc/election_dot_map/ElectionData_by_Ward.dbf"
-file_ed_block = "/media/devans/KINGSTON/misc/election_dot_map/ElectionData_by_Block.dbf"
+file_wards = "/media/KINGSTON/misc/election_dot_map/wards_2011"
+file_blocks = "/media/KINGSTON/misc/election_dot_map/blocks"
+file_ed_ward = "/media/KINGSTON/misc/election_dot_map/ElectionData_by_Ward.dbf"
+file_ed_block = "/media/KINGSTON/misc/election_dot_map/ElectionData_by_Block.dbf"
 file_voterPoints = "~/Documents/election_dot_map/voterPoints.csv"
 #colrs = c("#0571b0", "#ca0020", "#b2abd2", "#999999")
 createVoterXY <- function(voterKind, ward, block){
@@ -124,7 +124,7 @@ for (i in 1:length(wards)){
 dfVote$id = 1:nrow(dfVote)
 write.csv(
 	dfVote,
-	file_voterPoints,
+	"E:/miscFiles/testJS/voterDotMap/adamsCountyPres12Voters.csv",
 	row.names=F)
 ####### End Adams County Test ########
 ####### Junk Below ###################
