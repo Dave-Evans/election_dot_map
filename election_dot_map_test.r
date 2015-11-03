@@ -12,37 +12,45 @@ library(classInt)
 #	red
 	#ef8a62
 
-file_wards = "/media/devans/KINGSTON/misc/election_dot_map/wards_2011"
-file_blocks = "/media/devans/KINGSTON/misc/election_dot_map/blocks"
-file_ed_ward = "/media/devans/KINGSTON/misc/election_dot_map/ElectionData_by_Ward.dbf"
-file_ed_block = "/media/devans/KINGSTON/misc/election_dot_map/ElectionData_by_Block.dbf"
-file_voterPoints = "~/Documents/election_dot_map/voterPoints.csv"
+#file_wards = "/media/devans/KINGSTON/misc/election_dot_map/wards_2011"
+#file_blocks = "/media/devans/KINGSTON/misc/election_dot_map/blocks"
+#file_ed_ward = "/media/devans/KINGSTON/misc/election_dot_map/ElectionData_by_Ward.dbf"
+#file_ed_block = "/media/devans/KINGSTON/misc/election_dot_map/ElectionData_by_Block.dbf"
+
+file_wards = "C:/workspace/checkout_wards/election_dot_map/wards_2011"
+file_blocks = "C:/workspace/checkout_wards/election_dot_map/blocks"
+file_ed_ward = "C:/workspace/checkout_wards/election_dot_map/ElectionData_by_Ward.dbf"
+file_ed_block = "C:/workspace/checkout_wards/election_dot_map/ElectionData_by_Blocks.dbf"
+
+file_voterPoints = "~/voterPoints.csv"
 #colrs = c("#0571b0", "#ca0020", "#b2abd2", "#999999")
-createVoterXY <- function(voterKind, ward, block){
+createVoterXY <- function(voterKind, block){
 	#returns a dataframe of x, y, class (voterKind) and color
 #	voterKind = "NOVOTE"
 #	ward = wrd
 #	block = blck
-	if (ward@data$PERSONS18.x == 0) { return(data.frame()) } 
-	prp = block@data$PERSONS18/ward@data$PERSONS18.x
+	
+	if (block@data$PERSONS18.x == 0) { return(data.frame()) } 
+#	prp = block@data$PERSONS18/ward@data$PERSONS18.x
 	
 	if (voterKind == "DEM"){
-		nSamp = prp*ward@data[["PRES_DEM12"]]
+		nSamp = block@data[["PRES_DEM12"]]
 		colr = "#0571b0"
 	} else if (voterKind == "REP") {
-		nSamp = prp*ward@data[["PRES_REP12"]]
+		nSamp = block@data[["PRES_REP12"]]
 		colr = "#ca0020"
 	} else if (voterKind == "IND") {
-		nSamp = prp*(ward@data[["PRES_TOT12"]] - (ward@data[["PRES_REP12"]] + ward@data[["PRES_DEM12"]]))
+		nSamp = (block@data[["PRES_TOT12"]] - (block@data[["PRES_REP12"]] + block@data[["PRES_DEM12"]]))
 		colr = "#b2abd2"
 	} else {
-		nSamp = prp*(ward@data[["PERSONS18.x"]] - ward@data[["PRES_TOT12"]])
+		nSamp = (block@data[["PERSONS18.x"]] - block@data[["PRES_TOT12"]])
 		colr = "#9999999"
 	}
 	
 #	print(paste("Proportion", voterKind, "=", nSamp))
 	
 	# going to be issues here due to missampled attempts
+	print(length(nSamp))
 	if (round(nSamp) <= 0){ return(data.frame())}
 	b_notDone = TRUE
 	while (b_notDone){
@@ -60,11 +68,17 @@ createVoterXY <- function(voterKind, ward, block){
 	
 	if (length(samp) == 0){ return(data.frame())}
 	gcs_samp = spTransform(samp, CRS("+proj=longlat +datum=NAD83"))
-	tmpDF = data.frame(
-				x=(coordinates(gcs_samp))[,1],
-				y=(coordinates(gcs_samp))[,2],
-				voterType=voterKind,
-				COLOR=colr)
+	tmpDF = paste(
+		coordinates(gcs_samp)[,1],
+		coordinates(gcs_samp)[,2],
+		voterKind,
+		colr,
+		sep=",")
+#	tmpDF = data.frame(
+#				x=(coordinates(gcs_samp))[,1],
+#				y=(coordinates(gcs_samp))[,2],
+#				voterType=voterKind,
+#				COLOR=colr)
 	return(tmpDF)	
 }
 
@@ -89,37 +103,47 @@ blocks = readOGR(
 			dsn=dirname(file_blocks),
 			layer=basename(file_blocks))
 
-ed = read.dbf(file_ed_ward)
-wards = merge(wards, ed, by="GEOID10")
+ed = read.dbf(file_ed_block)
+blocks = merge(blocks, ed, by="GEOID10")
 
 ### test ###
+
+
+#wards = subset(wards, CNTY_NAME.x == "Adams")
+#blocks = subset(blocks, CNTY_NAME == "Adams")
+
+#for (i in 1:length(wards)){
+#	print(paste("Working on", i))
+#	print(paste("    County of", wards@data$CNTY_NAME.x[i]))
+#	wrd = wards[i,]
+#	wrdid = wrd@data$WARD_FIPS
+##	pop18_wrd = wrd@data$PERSONS18.x
+#	blcks = subset(blocks, WARD_FIPS == wrdid)
 dfVote = data.frame()
-
-wards = subset(wards, CNTY_NAME.x == "Adams")
-blocks = subset(blocks, CNTY_NAME == "Adams")
-
-for (i in 1:length(wards)){
-	print(paste("Working on", i))
-	print(paste("    County of", wards@data$CNTY_NAME.x[i]))
-	wrd = wards[i,]
-	wrdid = wrd@data$WARD_FIPS
-#	pop18_wrd = wrd@data$PERSONS18.x
-	blcks = subset(blocks, WARD_FIPS == wrdid)
-	
-	
-	for (j in 1:length(blcks)){
-#		print(paste("    I'm working on number: ", j))
-		blck = blcks[j,]
+cat("lon,lat,voterType,COLOR", file=file_voterPoints, append=FALSE, sep="\n")
+for (j in 1:length(blocks)){
+	print(paste("I'm working on number: ", j))
+	blck = blocks[j,]
 #		pop18_blck = blck@data$PERSONS18 
 #		prp = round(pop18_blck/pop18_wrd, 3)
-		for (voter in voterTypes) {
-			tmpDF = createVoterXY(voter, wrd, blck)
-			if (nrow(tmpDF)==0){next}
-			dfVote = rbind(dfVote, tmpDF)
-		}
+
 		
+		
+
+	for (voter in voterTypes) {
+		tmpDF = createVoterXY(voter,blck)
+#		if (nrow(tmpDF)==0){next}
+#		dfVote = rbind(dfVote, tmpDF)
+		if (class(tmpDF)=="data.frame") { 
+			print("    skipping")
+			next
+		}
+		cat(tmpDF, file=file_voterPoints, append=TRUE, sep="\n")	
 	}
+	close(file(file_voterPoints))
+	
 }
+#}
 
 dfVote$id = 1:nrow(dfVote)
 write.csv(
